@@ -1,1 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SET 專業計算器 | 極簡版</title>
+    <style>
+        /* 極簡黑白風格，搭配卡牌三原色 */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --border-color: #000000;
+            --slot-bg: #f8f9fa;
+            
+            /* 卡牌專屬三色 (依據圖片特調) */
+            --c0: #d25e36; /* 橘色 */
+            --c1: #79b97b; /* 綠色 */
+            --c2: #6d53b6; /* 紫色 */
+            --c3: #8b929c; /* 選單用的灰色 */
+        }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        
+        body { 
+            background: var(--bg-color); 
+            color: var(--text-color); 
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 15px; min-height: 100vh; 
+        }
+
+        header { text-align: center; margin-bottom: 20px; width: 100%; max-width: 500px; }
+        h1 { font-size: 1.8rem; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; border-bottom: 4px solid #000; display: inline-block; padding-bottom: 5px; }
+
+        /* 牌數控制區 */
+        .board-controls {
+            display: flex; gap: 8px; align-items: center; justify-content: center;
+            width: 100%; max-width: 500px; margin-bottom: 15px;
+        }
+        .board-controls span { font-weight: bold; }
+        .size-btn { 
+            padding: 6px 12px; border: 2px solid #000; background: #fff; color: #000; 
+            font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.1s; 
+        }
+        .size-btn.active { background: #000; color: #fff; }
+
+        /* 桌面卡牌網格 (強制3個一排，自動縮放) */
+        .grid { 
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; 
+            width: 100%; max-width: 500px; margin-bottom: 25px; 
+        }
+        
+        .slot { 
+            aspect-ratio: 1.5 / 1; background: var(--slot-bg); 
+            border: 2px dashed #bbb; border-radius: 8px; 
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .slot.filled { border: 2px solid #ccc; background: #fff; }
+        
+        /* 連動標記特效 */
+        .slot.highlight {
+            border: 4px solid #000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .plus-icon { font-size: 2rem; color: #ccc; font-weight: 300; }
+
+        /* 主要按鈕 */
+        .btn-action { 
+            width: 100%; max-width: 500px; padding: 15px; 
+            background: #000; color: #fff; border: none; border-radius: 8px; 
+            font-size: 1.1rem; font-weight: bold; cursor: pointer; letter-spacing: 1px; transition: 0.2s; 
+        }
+        .btn-action:hover { background: #333; }
+
+        /* 解答顯示區 */
+        .results-container { width: 100%; max-width: 500px; margin-top: 25px; display: none; }
+        .result-title { font-weight: 900; font-size: 1.2rem; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .result-item { 
+            display: flex; align-items: center; gap: 10px; padding: 10px; 
+            border: 2px solid #eee; border-radius: 8px; margin-bottom: 10px; 
+            cursor: pointer; background: #fff; transition: 0.2s;
+        }
+        .result-item:hover { border-color: #000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .result-num { font-weight: 900; font-size: 1.1rem; min-width: 25px; }
+        .result-cards { display: flex; gap: 6px; flex: 1; }
+        .result-card-mini { flex: 1; aspect-ratio: 1.5 / 1; display: flex; align-items: center; justify-content: center; }
+
+        /* 編輯器 Modal */
+        .modal { 
+            display: none; position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: rgba(255,255,255,0.95); z-index:100; justify-content: center; align-items: center; padding: 15px; 
+        }
+        .modal-content { 
+            background: #fff; width: 100%; max-width: 450px; padding: 25px; 
+            border: 3px solid #000; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+        }
+        
+        .preview { 
+            height: 120px; background: #fff; border: 2px solid #000; border-radius: 8px; 
+            margin-bottom: 25px; display: flex; justify-content: center; align-items: center; 
+        }
+        
+        /* 選項按鈕區 */
+        .opt-row { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        .opt-label { width: 40px; font-weight: bold; font-size: 0.95rem; }
+        .opt-group { display: flex; gap: 8px; flex: 1; }
+        
+        .opt-btn { 
+            flex: 1; height: 50px; background: #fff; border: 2px solid #ccc; color: #000; 
+            border-radius: 6px; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; transition: 0.1s; font-size: 1.1rem; font-weight: bold;
+        }
+        .opt-btn.active { border-color: #000; background: #000; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SET CALCULATOR</h1>
+    </header>
+
+    <div class="board-controls" id="size-controls">
+        <span>牌數：</span>
+        <!-- JS 動態生成按鈕 -->
+    </div>
+
+    <div class="grid" id="grid"></div>
+    
+    <button class="btn-action" onclick="calcAnswers()">尋找所有組合解答</button>
+    
+    <div class="results-container" id="results-container">
+        <div class="result-title" id="result-title">解答列表</div>
+        <div id="results-list"></div>
+    </div>
+
+    <!-- 編輯器 Modal -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="preview" id="preview"></div>
+            <div id="controls"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-action" style="background: #fff; color: #000; border: 2px solid #000;" onclick="closeModal()">取消</button>
+                <button class="btn-action" onclick="saveCard()">確認卡牌</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- 1. 精準繪製的圖形 SVG 路徑 ---
+    const PATHS = [
+        // 沙漏：上下平齊，兩側向中心交會，形成兩個連通的半圓 (D型)
+        'M -12,-15 L 12,-15 C 12,-5 5,-1 0,0 C 5,1 12,5 12,15 L -12,15 C -12,5 -5,1 0,0 C -5,-1 -12,-5 -12,-15 Z',
+        // 星芒：四角向中心內凹
+        'M 0,-18 C 3,-5 5,-3 18,0 C 5,3 3,5 0,18 C -3,5 -5,3 -18,0 C -5,-3 -3,-5 0,-18 Z',
+        // 幸運草：四瓣圓角，稍後會套用 rotate(45) 使其呈現 X 形
+        'M -6,-6 C -6,-16 6,-16 6,-6 C 16,-6 16,6 6,6 C 6,16 -6,16 -6,6 C -16,6 -16,-6 -6,-6 Z'
+    ];
+
+    const COLORS = ['#d25e36', '#79b97b', '#6d53b6', '#8b929c']; // 橘, 綠, 紫, 灰(預覽用)
+
+    let board = [];
+    let cur = { c: 0, s: 0, f: 0, n: 0 }; 
+    let activeIdx = 0;
+
+    // --- 2. 萬無一失的卡牌生成引擎 (內建專屬 Pattern 解決線條顏色問題) ---
+    function getCardSVG(c, s, f, n, isForUI = false) {
+        const colIdx = isForUI ? 3 : c; // 若為 UI 預覽則使用灰色
+        const col = COLORS[colIdx];
+        
+        // 動態生成專屬的橫條紋 SVG 填充，顏色必定跟隨卡牌！
+        const defs = f === 1 ? `<defs>
+            <pattern id="pat-${colIdx}-${s}-${n}" width="1" height="6" patternUnits="userSpaceOnUse">
+                <line x1="0" y1="3" x2="150" y2="3" stroke="${col}" stroke-width="2"/>
+            </pattern>
+        </defs>` : '';
+
+        const fill = f === 0 ? 'none' : (f === 1 ? `url(#pat-${colIdx}-${s}-${n})` : col);
+        const pos = n === 0 ? [75] : (n === 1 ? [40, 110] : [25, 75, 125]);
+        const rotate = s === 2 ? ' rotate(45)' : ''; // 幸運草專屬 X 形旋轉
+        
+        const shapes = pos.map(x => `<g transform="translate(${x},50)${rotate}">
+            <path d="${PATHS[s]}" fill="${fill}" stroke="${col}" stroke-width="3" stroke-linejoin="round"/>
+        </g>`).join('');
+
+        return `<svg viewBox="0 0 150 100" style="width:100%; height:100%; display:block;">
+            ${defs}${shapes}
+        </svg>`;
+    }
+
+    // --- 正方形專用生成引擎 (避免填充選項與形狀選項混淆) ---
+    function getSquareSVG(f, isActive) {
+        const col = isActive ? '#ffffff' : '#000000';
+        const defs = f === 1 ? `<defs>
+            <pattern id="pat-sq-${isActive}" width="1" height="6" patternUnits="userSpaceOnUse">
+                <line x1="0" y1="3" x2="40" y2="3" stroke="${col}" stroke-width="2"/>
+            </pattern>
+        </defs>` : '';
+        
+        const fill = f === 0 ? 'none' : (f === 1 ? `url(#pat-sq-${isActive})` : col);
+        
+        return `<svg viewBox="0 0 40 40" style="width:28px; height:28px; display:block; margin: 0 auto;">
+            ${defs}
+            <rect x="4" y="4" width="32" height="32" rx="4" fill="${fill}" stroke="${col}" stroke-width="3" />
+        </svg>`;
+    }
+
+    // --- 3. 介面與控制項 ---
+    function setBoardSize(size) {
+        board = new Array(size).fill(null);
+        document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-size-' + size).classList.add('active');
+        document.getElementById('results-container').style.display = 'none';
+        initGrid();
+    }
+
+    function initSizeControls() {
+        const sizes = [6, 9, 12, 15];
+        const container = document.getElementById('size-controls');
+        sizes.forEach(size => {
+            const btn = document.createElement('button');
+            btn.className = 'size-btn';
+            btn.id = 'btn-size-' + size;
+            btn.innerText = size;
+            btn.onclick = () => setBoardSize(size);
+            container.appendChild(btn);
+        });
+    }
+
+    function initGrid() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        board.forEach((card, i) => {
+            const slot = document.createElement('div');
+            slot.className = 'slot' + (card ? ' filled' : '');
+            slot.id = 'slot-' + i;
+            slot.innerHTML = card ? getCardSVG(card.c, card.s, card.f, card.n) : '<div class="plus-icon">+</div>';
+            slot.onclick = () => openModal(i);
+            grid.appendChild(slot);
+        });
+    }
+
+    function openModal(index) {
+        activeIdx = index;
+        cur = board[index] ? { ...board[index] } : { c: 0, s: 0, f: 0, n: 0 };
+        document.getElementById('modal').style.display = 'flex';
+        renderControls();
+        updatePreview();
+    }
+
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function updatePreview() { document.getElementById('preview').innerHTML = getCardSVG(cur.c, cur.s, cur.f, cur.n); }
+
+    function setProp(key, val) {
+        cur[key] = val;
+        renderControls();
+        updatePreview();
+    }
+
+    function renderControls() {
+        const ctrls = document.getElementById('controls');
+        
+        // 顏色按鈕 (實體色塊)
+        const colorHtml = [0,1,2].map(v => 
+            `<button class="opt-btn ${cur.c === v ? 'active' : ''}" onclick="setProp('c', ${v})">
+                <div style="width:24px;height:24px;border-radius:50%;background:${COLORS[v]}; border:2px solid ${cur.c === v ? '#fff' : 'transparent'}"></div>
+            </button>`
+        ).join('');
+
+        // 形狀按鈕 (灰階外框)
+        const shapeHtml = [0,1,2].map(v => 
+            `<button class="opt-btn ${cur.s === v ? 'active' : ''}" onclick="setProp('s', ${v})">
+                <div style="width:40px; height:26px;">${getCardSVG(0, v, 0, 0, true).replace(/#8b929c/g, cur.s === v ? '#fff' : '#000')}</div>
+            </button>`
+        ).join('');
+
+        // 填充按鈕 (完全分離的正方形圖例)
+        const fillHtml = [0,1,2].map(v => 
+            `<button class="opt-btn ${cur.f === v ? 'active' : ''}" onclick="setProp('f', ${v})">
+                ${getSquareSVG(v, cur.f === v)}
+            </button>`
+        ).join('');
+
+        // 數量按鈕 (1, 2, 3)
+        const countHtml = [0,1,2].map(v => 
+            `<button class="opt-btn ${cur.n === v ? 'active' : ''}" onclick="setProp('n', ${v})">${v + 1}</button>`
+        ).join('');
+
+        ctrls.innerHTML = `
+            <div class="opt-row"><div class="opt-label">顏色</div><div class="opt-group">${colorHtml}</div></div>
+            <div class="opt-row"><div class="opt-label">圖形</div><div class="opt-group">${shapeHtml}</div></div>
+            <div class="opt-row"><div class="opt-label">填充</div><div class="opt-group">${fillHtml}</div></div>
+            <div class="opt-row"><div class="opt-label">數量</div><div class="opt-group">${countHtml}</div></div>
+        `;
+    }
+
+    function saveCard() {
+        board[activeIdx] = { ...cur };
+        closeModal();
+        clearHighlights(); 
+        document.getElementById('results-container').style.display = 'none';
+        initGrid();
+    }
+
+    // --- 4. 尋找解答邏輯 ---
+    function calcAnswers() {
+        clearHighlights();
+        let sets = [];
+        const n = board.length;
+        
+        for(let i = 0; i < n; i++) {
+            for(let j = i + 1; j < n; j++) {
+                for(let k = j + 1; k < n; k++) {
+                    if(!board[i] || !board[j] || !board[k]) continue;
+                    
+                    const c1=board[i], c2=board[j], c3=board[k];
+                    // SET 判定：每個屬性相加除以3必須餘0
+                    if ((c1.c + c2.c + c3.c) % 3 === 0 &&
+                        (c1.s + c2.s + c3.s) % 3 === 0 &&
+                        (c1.f + c2.f + c3.f) % 3 === 0 &&
+                        (c1.n + c2.n + c3.n) % 3 === 0) {
+                        sets.push([i, j, k]);
+                    }
+                }
+            }
+        }
+
+        renderResults(sets);
+    }
+
+    function renderResults(sets) {
+        const container = document.getElementById('results-container');
+        const list = document.getElementById('results-list');
+        const title = document.getElementById('result-title');
+        
+        container.style.display = 'block';
+        list.innerHTML = '';
+
+        if (sets.length === 0) {
+            title.innerHTML = `未找到任何配對組合`;
+            return;
+        }
+
+        title.innerHTML = `找到 ${sets.length} 組配對 (點擊解答可標記對應卡牌)`;
+
+        sets.forEach((set, idx) => {
+            const [i, j, k] = set;
+            const row = document.createElement('div');
+            row.className = 'result-item';
+            row.innerHTML = `
+                <div class="result-num">#${idx + 1}</div>
+                <div class="result-cards">
+                    <div class="result-card-mini">${getCardSVG(board[i].c, board[i].s, board[i].f, board[i].n)}</div>
+                    <div class="result-card-mini">${getCardSVG(board[j].c, board[j].s, board[j].f, board[j].n)}</div>
+                    <div class="result-card-mini">${getCardSVG(board[k].c, board[k].s, board[k].f, board[k].n)}</div>
+                </div>
+            `;
+            // 點擊解答時觸發標記
+            row.onclick = () => highlightCards(set);
+            list.appendChild(row);
+        });
+
+        container.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function clearHighlights() {
+        document.querySelectorAll('.slot').forEach(el => el.classList.remove('highlight'));
+    }
+
+    function highlightCards(indices) {
+        clearHighlights();
+        indices.forEach(idx => {
+            document.getElementById('slot-' + idx).classList.add('highlight');
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 啟動程式 (預設 9 張牌)
+    initSizeControls();
+    setBoardSize(9);
+</script>
+</body>
+</html>
